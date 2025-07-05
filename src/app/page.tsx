@@ -9,6 +9,9 @@ import { DetailProduitsSearch } from '@/components/kpi/DetailProduitsSearch'
 import { EvolutionsSearch } from '@/components/kpi/EvolutionsSearch'
 import { AnalyseMargeSearch } from '@/components/kpi/AnalyseMargeSearch'
 import { AnalyseStockSearch } from '@/components/kpi/AnalyseStockSearch'
+import { AnalyseParetoSearch } from '@/components/kpi/AnalyseParetoSearch'
+import { AnalyseAbcXyzSearch } from '@/components/kpi/AnalyseAbcXyzSearch'
+import { AnalyseSaisonnaliteSearch } from '@/components/kpi/AnalyseSaisonnaliteSearch'
 
 export default function HomePage(): React.ReactElement {
   const [selectedKpi, setSelectedKpi] = useState<string>('')
@@ -56,6 +59,24 @@ export default function HomePage(): React.ReactElement {
       label: 'Analyse Stock par Seuil',
       description: 'Identifier les produits en rupture/sous-stock ou en sur-stock selon un seuil en mois',
       endpoint: '/api/kpis/analyse-stock'
+    },
+    {
+      id: 'analyse-pareto',
+      label: 'Analyse Pareto',
+      description: 'Analyse Pareto avec seuil personnalisé : X% du CA représenté par combien de références',
+      endpoint: '/api/kpis/analyse-pareto'
+    },
+    {
+      id: 'analyse-abc-xyz',
+      label: 'Classification ABC/XYZ',
+      description: 'Classification intelligente : valeur financière (ABC) + régularité ventes (XYZ) pour optimiser la gestion',
+      endpoint: '/api/kpis/analyse-abc-xyz'
+    },
+    {
+      id: 'analyse-saisonnalite',
+      label: 'Saisonnalité et Prédictions',
+      description: 'Analyse des cycles saisonniers + prédictions des ventes futures pour optimiser les commandes',
+      endpoint: '/api/kpis/analyse-saisonnalite'
     }
   ]
 
@@ -75,6 +96,12 @@ export default function HomePage(): React.ReactElement {
         return <AnalyseMargeSearch />
       case 'analyse-stock':
         return <AnalyseStockSearch />
+      case 'analyse-pareto':
+        return <AnalyseParetoSearch />
+      case 'analyse-abc-xyz':
+        return <AnalyseAbcXyzSearch />
+      case 'analyse-saisonnalite':
+        return <AnalyseSaisonnaliteSearch />
       default:
         return null
     }
