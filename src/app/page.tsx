@@ -1,103 +1,120 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useState } from 'react'
+import type { KpiOption } from '@/types/kpi'
+import { FournisseursSearch } from '@/components/kpi/FournisseursSearch'
+import { CaTtcSearch } from '@/components/kpi/CaTtcSearch'
+import { MargeTtcSearch } from '@/components/kpi/MargeTtcSearch'
+import { DetailProduitsSearch } from '@/components/kpi/DetailProduitsSearch'
+import { EvolutionsSearch } from '@/components/kpi/EvolutionsSearch'
+import { AnalyseMargeSearch } from '@/components/kpi/AnalyseMargeSearch'
+import { AnalyseStockSearch } from '@/components/kpi/AnalyseStockSearch'
+
+export default function HomePage(): React.ReactElement {
+  const [selectedKpi, setSelectedKpi] = useState<string>('')
+
+  // Liste des KPIs disponibles
+  const availableKpis: KpiOption[] = [
+    {
+      id: 'fournisseurs',
+      label: 'Recherche Fournisseurs',
+      description: 'Rechercher et lister tous les fournisseurs avec recherche en temps réel',
+      endpoint: '/api/kpis/fournisseurs'
+    },
+    {
+      id: 'ca-ttc',
+      label: 'CA TTC Global',
+      description: 'Calculer le chiffre d\'affaires TTC avec filtres par pharmacie, fournisseur, famille ou EAN13',
+      endpoint: '/api/kpis/ca-ttc'
+    },
+    {
+      id: 'marge-ttc',
+      label: 'Marge TTC Global',
+      description: 'Calculer la marge TTC et le taux de marge avec les mêmes filtres que le CA',
+      endpoint: '/api/kpis/marge-ttc'
+    },
+    {
+      id: 'detail-produits',
+      label: 'Détail Produits',
+      description: 'Analyse détaillée par produit : prix, stocks, marges, ventes 12 mois avec historique mensuel',
+      endpoint: '/api/kpis/detail-produits'
+    },
+    {
+      id: 'evolutions',
+      label: 'Évolutions Comparatives',
+      description: 'Comparaison entre deux périodes : évolutions du CA, marge, taux de marge et quantités',
+      endpoint: '/api/kpis/evolutions'
+    },
+    {
+      id: 'analyse-marge',
+      label: 'Analyse Marge par Seuil',
+      description: 'Identifier les produits au-dessus ou en-dessous d\'un seuil de marge avec analyse détaillée',
+      endpoint: '/api/kpis/analyse-marge'
+    },
+    {
+      id: 'analyse-stock',
+      label: 'Analyse Stock par Seuil',
+      description: 'Identifier les produits en rupture/sous-stock ou en sur-stock selon un seuil en mois',
+      endpoint: '/api/kpis/analyse-stock'
+    }
+  ]
+
+  const renderKpiComponent = (): React.ReactElement | null => {
+    switch (selectedKpi) {
+      case 'fournisseurs':
+        return <FournisseursSearch />
+      case 'ca-ttc':
+        return <CaTtcSearch />
+      case 'marge-ttc':
+        return <MargeTtcSearch />
+      case 'detail-produits':
+        return <DetailProduitsSearch />
+      case 'evolutions':
+        return <EvolutionsSearch />
+      case 'analyse-marge':
+        return <AnalyseMargeSearch />
+      case 'analyse-stock':
+        return <AnalyseStockSearch />
+      default:
+        return null
+    }
+  }
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="container mx-auto p-6 max-w-6xl">
+      <div className="bg-white rounded-lg shadow-sm border p-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">
+          PharmaLab - Extracteur de Données
+        </h1>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        {/* Sélecteur KPI */}
+        <div className="mb-6">
+          <label htmlFor="kpi-select" className="block text-sm font-medium text-gray-700 mb-2">
+            Type d'extraction :
+          </label>
+          <select
+            id="kpi-select"
+            value={selectedKpi}
+            onChange={(e) => setSelectedKpi(e.target.value)}
+            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+            <option value="">Sélectionner un KPI...</option>
+            {availableKpis.map((kpi) => (
+              <option key={kpi.id} value={kpi.id}>
+                {kpi.label}
+              </option>
+            ))}
+          </select>
+          {selectedKpi && availableKpis.find(opt => opt.id === selectedKpi) && (
+            <p className="text-sm text-gray-600 mt-2">
+              {availableKpis.find(opt => opt.id === selectedKpi)?.description}
+            </p>
+          )}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* Rendu du composant KPI sélectionné */}
+        {renderKpiComponent()}
+      </div>
     </div>
-  );
+  )
 }
