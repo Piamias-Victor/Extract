@@ -128,7 +128,27 @@ export async function getAnalyseMarge(
 
     const produitIds = finalProduitsData.map(p => p.id)
 
-    // Étape 3: Récupérer ventes des 12 derniers mois
+    // Étape 3: Récupérer les prix d'achats
+    const { data: prixAchatsData, error: prixAchatsError } = await config.client
+      .from('prix_achats')
+      .select('produit_id, prix_net_ht')
+      .in('produit_id', produitIds)
+
+    if (prixAchatsError) {
+      throw new Error(prixAchatsError.message)
+    }
+
+    // Étape 4: Récupérer les prix de vente
+    const { data: prixVentesData, error: prixVentesError } = await config.client
+      .from('prix_vente')
+      .select('produit_id, prix_vente_ttc, prix_promo_ttc, date_debut_promo, date_fin_promo')
+      .in('produit_id', produitIds)
+
+    if (prixVentesError) {
+      throw new Error(prixVentesError.message)
+    }
+
+    // Étape 5: Récupérer les ventes des 12 derniers mois
     const anneeDebut = il_y_a_12_mois.getFullYear()
     const anneeFin = maintenant.getFullYear()
     const moisDebut = il_y_a_12_mois.getMonth() + 1
@@ -136,12 +156,7 @@ export async function getAnalyseMarge(
 
     let ventesQuery = config.client
       .from('ventes_mensuelles')
-      .select(`
-        produit_id,
-        quantite_vendue,
-        annee,
-        mois
-      `)
+      .select('produit_id, quantite_vendue')
       .in('produit_id', produitIds)
 
     if (anneeDebut === anneeFin) {
@@ -150,9 +165,9 @@ export async function getAnalyseMarge(
         .gte('mois', moisDebut)
         .lte('mois', moisFin)
     } else {
-      ventesQuery = ventesQuery
-        .gte('annee', anneeDebut)
-        .lte('annee', anneeFin)
+      ventesQuery = ventesQuery.or(
+        `and(annee.eq.${anneeDebut},mois.gte.${moisDebut}),and(annee.eq.${anneeFin},mois.lte.${moisFin})`
+      )
     }
 
     const { data: ventesData, error: ventesError } = await ventesQuery
@@ -161,117 +176,100 @@ export async function getAnalyseMarge(
       throw new Error(ventesError.message)
     }
 
-    // Étape 4: Récupérer prix de vente actuels
-    const { data: prixVenteData, error: prixVenteError } = await config.client
-      .from('prix_vente')
-      .select(`
-        produit_id,
-        prix_vente_ttc,
-        prix_promo_ttc,
-        date_debut_promo,
-        date_fin_promo
-      `)
-      .in('produit_id', produitIds)
-      .order('date_extraction', { ascending: false })
+    // Organiser les données par produit
+    const prixAchatsParProduit = new Map<number, any>()
+    prixAchatsData?.forEach(pa => {
+      if (!prixAchatsParProduit.has(pa.produit_id)) {
+        prixAchatsParProduit.set(pa.produit_id, pa)
+      }
+    })
 
-    if (prixVenteError) {
-      throw new Error(prixVenteError.message)
-    }
+    const prixVentesParProduit = new Map<number, any>()
+    prixVentesData?.forEach(pv => {
+      if (!prixVentesParProduit.has(pv.produit_id)) {
+        prixVentesParProduit.set(pv.produit_id, pv)
+      }
+    })
 
-    // Étape 5: Récupérer prix d'achat actuels
-    const { data: prixAchatData, error: prixAchatError } = await config.client
-      .from('prix_achats')
-      .select(`
-        produit_id,
-        prix_net_ht
-      `)
-      .in('produit_id', produitIds)
-      .order('date_import', { ascending: false })
-
-    if (prixAchatError) {
-      throw new Error(prixAchatError.message)
-    }
-
-    // Créer des maps pour performance
     const ventesParProduit = new Map<number, number>()
     ventesData?.forEach(vente => {
-      const quantite = vente.quantite_vendue || 0
-      ventesParProduit.set(vente.produit_id, (ventesParProduit.get(vente.produit_id) || 0) + quantite)
+      const current = ventesParProduit.get(vente.produit_id) || 0
+      ventesParProduit.set(vente.produit_id, current + (vente.quantite_vendue || 0))
     })
 
-    const prixVenteParProduit = new Map<number, any>()
-    prixVenteData?.forEach(prix => {
-      if (!prixVenteParProduit.has(prix.produit_id)) {
-        prixVenteParProduit.set(prix.produit_id, prix)
-      }
-    })
-
-    const prixAchatParProduit = new Map<number, any>()
-    prixAchatData?.forEach(prix => {
-      if (!prixAchatParProduit.has(prix.produit_id)) {
-        prixAchatParProduit.set(prix.produit_id, prix)
-      }
-    })
-
-    // Étape 6: Analyser chaque produit et calculer les marges
-    const produitsAvecMarge: ProduitMarge[] = []
+    // Étape 6: Analyser TOUS les produits et calculer les marges
+    const tousLesProduitsAvecMarge: ProduitMarge[] = []
+    let margesTotales = 0
+    let caTotal = 0
+    let ventesTotales = 0
 
     finalProduitsData.forEach(produit => {
-      const prixVente = prixVenteParProduit.get(produit.id)
-      const prixAchat = prixAchatParProduit.get(produit.id)
+      const prixAchat = prixAchatsParProduit.get(produit.id)
+      const prixVente = prixVentesParProduit.get(produit.id)
       const ventes = ventesParProduit.get(produit.id) || 0
 
-      if (!prixVente || !prixAchat) return
+      // On inclut même les produits sans prix ou ventes pour avoir une vue complète
+      if (!prixAchat || !prixVente) {
+        // Produit sans données de prix - on l'inclut avec des valeurs par défaut
+        tousLesProduitsAvecMarge.push({
+          ean13: produit.ean13_principal,
+          nom: produit.designation,
+          prix_achat_ht: 0,
+          prix_vente_ttc: 0,
+          prix_promo_ttc: undefined,
+          pourcentage_marge_calcule: 0,
+          ecart_seuil: 0 - params.seuil_marge,
+          ventes_periode: ventes,
+          ca_periode: 0
+        })
+        return
+      }
 
-      // Calculer prix de vente effectif (avec promo si active)
+      const prixAchatHt = prixAchat.prix_net_ht
       let prixVenteTtc = prixVente.prix_vente_ttc
-      let promoActive = undefined
 
+      // Vérifier si promotion active
+      let promoActive: number | undefined
       if (prixVente.prix_promo_ttc && 
           prixVente.date_debut_promo && 
           prixVente.date_fin_promo) {
-        const datePromoDebut = new Date(prixVente.date_debut_promo)
-        const datePromoFin = new Date(prixVente.date_fin_promo)
-        
-        if (maintenant >= datePromoDebut && maintenant <= datePromoFin) {
-          prixVenteTtc = prixVente.prix_promo_ttc
+        const dateDebut = new Date(prixVente.date_debut_promo)
+        const dateFin = new Date(prixVente.date_fin_promo)
+        if (maintenant >= dateDebut && maintenant <= dateFin) {
           promoActive = prixVente.prix_promo_ttc
+          prixVenteTtc = prixVente.prix_promo_ttc
         }
       }
 
-      // Calculer prix d'achat TTC
-      const tva = produit.tva || 20
-      const prixAchatTtc = prixAchat.prix_net_ht * (1 + tva / 100)
-
-      // Calculer % de marge
+      // Calculer la marge (formule simplifiée pour l'exemple)
+      // Marge = (Prix vente TTC - Prix achat HT) / Prix vente TTC * 100
       const pourcentageMarge = prixVenteTtc > 0 ? 
-        ((prixVenteTtc - prixAchatTtc) / prixVenteTtc) * 100 : 0
+        ((prixVenteTtc - prixAchatHt) / prixVenteTtc) * 100 : 0
 
-      // Vérifier si le produit correspond au critère de seuil
-      const respecteCritere = params.mode === "dessous" ? 
-        pourcentageMarge < params.seuil_marge :
-        pourcentageMarge > params.seuil_marge
+      const ecartSeuil = pourcentageMarge - params.seuil_marge
+      const caPeriode = prixVenteTtc * ventes
 
-      if (respecteCritere) {
-        const ecartSeuil = pourcentageMarge - params.seuil_marge
-        const caPeriode = prixVenteTtc * ventes
+      // IMPORTANT: On ajoute TOUS les produits, pas seulement ceux qui respectent le critère
+      tousLesProduitsAvecMarge.push({
+        ean13: produit.ean13_principal,
+        nom: produit.designation,
+        prix_achat_ht: Number(prixAchatHt.toFixed(3)),
+        prix_vente_ttc: Number(prixVenteTtc.toFixed(2)),
+        prix_promo_ttc: promoActive ? Number(promoActive.toFixed(2)) : undefined,
+        pourcentage_marge_calcule: Number(pourcentageMarge.toFixed(2)),
+        ecart_seuil: Number(ecartSeuil.toFixed(2)),
+        ventes_periode: ventes,
+        ca_periode: Number(caPeriode.toFixed(2))
+      })
 
-        produitsAvecMarge.push({
-          ean13: produit.ean13_principal,
-          nom: produit.designation,
-          prix_achat_ht: Number(prixAchat.prix_net_ht.toFixed(3)),
-          prix_vente_ttc: Number(prixVente.prix_vente_ttc.toFixed(2)),
-          prix_promo_ttc: promoActive ? Number(promoActive.toFixed(2)) : undefined,
-          pourcentage_marge_calcule: Number(pourcentageMarge.toFixed(2)),
-          ecart_seuil: Number(ecartSeuil.toFixed(2)),
-          ventes_periode: ventes,
-          ca_periode: Number(caPeriode.toFixed(2))
-        })
-      }
+      // Accumuler pour les statistiques
+      margesTotales += (pourcentageMarge * caPeriode) / 100
+      caTotal += caPeriode
+      ventesTotales += ventes
     })
 
     // Trier par écart au seuil (les plus éloignés en premier)
-    produitsAvecMarge.sort((a, b) => {
+    tousLesProduitsAvecMarge.sort((a, b) => {
       if (params.mode === "dessous") {
         return a.ecart_seuil - b.ecart_seuil // Les plus négatifs en premier
       } else {
@@ -280,10 +278,7 @@ export async function getAnalyseMarge(
     })
 
     // Calculer le résumé
-    const margeTotal = produitsAvecMarge.reduce((sum, p) => sum + (p.pourcentage_marge_calcule * p.ca_periode / 100), 0)
-    const caTotal = produitsAvecMarge.reduce((sum, p) => sum + p.ca_periode, 0)
-    const ventesTotal = produitsAvecMarge.reduce((sum, p) => sum + p.ventes_periode, 0)
-    const margeMoyenne = caTotal > 0 ? (margeTotal / caTotal) * 100 : 0
+    const margeMoyenne = caTotal > 0 ? (margesTotales / caTotal) * 100 : 0
 
     const result: AnalyseMargeResult = {
       criteres: {
@@ -294,12 +289,12 @@ export async function getAnalyseMarge(
           fin: periodeFin
         }
       },
-      produits_trouves: produitsAvecMarge,
-      total_produits: produitsAvecMarge.length,
+      produits_trouves: tousLesProduitsAvecMarge, // TOUS les produits maintenant
+      total_produits: tousLesProduitsAvecMarge.length,
       resume: {
         marge_moyenne: Number(margeMoyenne.toFixed(2)),
         ca_total: Number(caTotal.toFixed(2)),
-        ventes_totales: ventesTotal
+        ventes_totales: ventesTotales
       }
     }
 

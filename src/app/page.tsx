@@ -1,146 +1,297 @@
+// src/app/test-molecules/page.tsx
 'use client'
 
 import { useState } from 'react'
-import type { KpiOption } from '@/types/kpi'
-import { FournisseursSearch } from '@/components/kpi/FournisseursSearch'
-import { CaTtcSearch } from '@/components/kpi/CaTtcSearch'
-import { MargeTtcSearch } from '@/components/kpi/MargeTtcSearch'
-import { DetailProduitsSearch } from '@/components/kpi/DetailProduitsSearch'
-import { EvolutionsSearch } from '@/components/kpi/EvolutionsSearch'
-import { AnalyseMargeSearch } from '@/components/kpi/AnalyseMargeSearch'
-import { AnalyseStockSearch } from '@/components/kpi/AnalyseStockSearch'
-import { AnalyseParetoSearch } from '@/components/kpi/AnalyseParetoSearch'
-import { AnalyseAbcXyzSearch } from '@/components/kpi/AnalyseAbcXyzSearch'
-import { AnalyseSaisonnaliteSearch } from '@/components/kpi/AnalyseSaisonnaliteSearch'
+import { 
+  BarChart3,
+  TrendingUp, 
+  TrendingDown, 
+  Package, 
+  DollarSign,
+  Home,
+  Users,
+  Settings,
+  FileText,
+  AlertTriangle,
+  Activity,
+  PieChart
+} from 'lucide-react'
+import { KpiCard } from '@/components/molecules/KpiCard'
+import { Sidebar } from '@/components/molecules/Sidebar'
+import { Chart } from '@/components/molecules/Chart'
+import { Navigation } from '@/components/molecules/Navigation'
+import { Card, CardHeader, CardContent } from '@/components/atoms/Card'
+import { Text } from '@/components/atoms/Text'
+import { Button } from '@/components/atoms/Button'
 
-export default function HomePage(): React.ReactElement {
-  const [selectedKpi, setSelectedKpi] = useState<string>('')
+export default function TestMoleculesPage(): React.ReactElement {
+  const [selectedTab, setSelectedTab] = useState<string>('dashboard')
+  const [selectedPill, setSelectedPill] = useState<string>('marge')
+  const [loading, setLoading] = useState<boolean>(false)
 
-  // Liste des KPIs disponibles
-  const availableKpis: KpiOption[] = [
+  // Mock data pour les KPIs
+  const kpiData = [
     {
-      id: 'fournisseurs',
-      label: 'Recherche Fournisseurs',
-      description: 'Rechercher et lister tous les fournisseurs avec recherche en temps réel',
-      endpoint: '/api/kpis/fournisseurs'
+      title: "CA 12 MOIS",
+      value: "847293",
+      icon: DollarSign,
+      trend: { value: 12.3, type: 'positive' as const, label: "vs année précédente" }
     },
     {
-      id: 'ca-ttc',
-      label: 'CA TTC Global',
-      description: 'Calculer le chiffre d\'affaires TTC avec filtres par pharmacie, fournisseur, famille ou EAN13',
-      endpoint: '/api/kpis/ca-ttc'
+      title: "MARGE 12 MOIS", 
+      value: "23.7%",
+      icon: TrendingUp,
+      trend: { value: -1.2, type: 'negative' as const, label: "vs année précédente" }
     },
     {
-      id: 'marge-ttc',
-      label: 'Marge TTC Global',
-      description: 'Calculer la marge TTC et le taux de marge avec les mêmes filtres que le CA',
-      endpoint: '/api/kpis/marge-ttc'
+      title: "STOCK TOTAL",
+      value: "2.4 mois",
+      icon: Package,
+      trend: { value: 0, type: 'neutral' as const, label: "Rotation normale" }
     },
     {
-      id: 'detail-produits',
-      label: 'Détail Produits',
-      description: 'Analyse détaillée par produit : prix, stocks, marges, ventes 12 mois avec historique mensuel',
-      endpoint: '/api/kpis/detail-produits'
-    },
-    {
-      id: 'evolutions',
-      label: 'Évolutions Comparatives',
-      description: 'Comparaison entre deux périodes : évolutions du CA, marge, taux de marge et quantités',
-      endpoint: '/api/kpis/evolutions'
-    },
-    {
-      id: 'analyse-marge',
-      label: 'Analyse Marge par Seuil',
-      description: 'Identifier les produits au-dessus ou en-dessous d\'un seuil de marge avec analyse détaillée',
-      endpoint: '/api/kpis/analyse-marge'
-    },
-    {
-      id: 'analyse-stock',
-      label: 'Analyse Stock par Seuil',
-      description: 'Identifier les produits en rupture/sous-stock ou en sur-stock selon un seuil en mois',
-      endpoint: '/api/kpis/analyse-stock'
-    },
-    {
-      id: 'analyse-pareto',
-      label: 'Analyse Pareto',
-      description: 'Analyse Pareto avec seuil personnalisé : X% du CA représenté par combien de références',
-      endpoint: '/api/kpis/analyse-pareto'
-    },
-    {
-      id: 'analyse-abc-xyz',
-      label: 'Classification ABC/XYZ',
-      description: 'Classification intelligente : valeur financière (ABC) + régularité ventes (XYZ) pour optimiser la gestion',
-      endpoint: '/api/kpis/analyse-abc-xyz'
-    },
-    {
-      id: 'analyse-saisonnalite',
-      label: 'Saisonnalité et Prédictions',
-      description: 'Analyse des cycles saisonniers + prédictions des ventes futures pour optimiser les commandes',
-      endpoint: '/api/kpis/analyse-saisonnalite'
+      title: "ÉVOLUTION CA",
+      value: "-5.2%",
+      icon: TrendingDown,
+      trend: { value: -5.2, type: 'negative' as const, label: "Mois dernier" }
     }
   ]
 
-  const renderKpiComponent = (): React.ReactElement | null => {
-    switch (selectedKpi) {
-      case 'fournisseurs':
-        return <FournisseursSearch />
-      case 'ca-ttc':
-        return <CaTtcSearch />
-      case 'marge-ttc':
-        return <MargeTtcSearch />
-      case 'detail-produits':
-        return <DetailProduitsSearch />
-      case 'evolutions':
-        return <EvolutionsSearch />
-      case 'analyse-marge':
-        return <AnalyseMargeSearch />
-      case 'analyse-stock':
-        return <AnalyseStockSearch />
-      case 'analyse-pareto':
-        return <AnalyseParetoSearch />
-      case 'analyse-abc-xyz':
-        return <AnalyseAbcXyzSearch />
-      case 'analyse-saisonnalite':
-        return <AnalyseSaisonnaliteSearch />
-      default:
-        return null
-    }
+  // Mock data pour le graphique
+  const chartData = [
+    { name: 'Jan', value: 65000 },
+    { name: 'Fév', value: 78000 },
+    { name: 'Mar', value: 82000 },
+    { name: 'Avr', value: 71000 },
+    { name: 'Mai', value: 88000 },
+    { name: 'Jun', value: 94000 },
+    { name: 'Jul', value: 87000 },
+    { name: 'Aoû', value: 92000 },
+    { name: 'Sep', value: 84000 },
+    { name: 'Oct', value: 89000 },
+    { name: 'Nov', value: 76000 },
+    { name: 'Déc', value: 98000 }
+  ]
+
+  // Navigation items pour la sidebar
+  const sidebarItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: Home, active: selectedTab === 'dashboard' },
+    { id: 'kpis', label: 'KPIs', icon: BarChart3, active: selectedTab === 'kpis' },
+    { id: 'laboratoires', label: 'Laboratoires', icon: Users, active: selectedTab === 'laboratoires' },
+    { id: 'produits', label: 'Produits', icon: Package, active: selectedTab === 'produits' },
+    { id: 'analyses', label: 'Analyses', icon: PieChart, active: selectedTab === 'analyses' },
+    { id: 'rapports', label: 'Rapports', icon: FileText, active: selectedTab === 'rapports' },
+    { id: 'alertes', label: 'Alertes', icon: AlertTriangle, active: selectedTab === 'alertes', disabled: true },
+    { id: 'settings', label: 'Paramètres', icon: Settings, active: selectedTab === 'settings' }
+  ]
+
+  // Tabs pour la navigation
+  const navigationTabs = [
+    { id: 'dashboard', label: 'Vue d\'ensemble', icon: Home, active: selectedTab === 'dashboard' },
+    { id: 'kpis', label: 'KPIs', icon: Activity, active: selectedTab === 'kpis', count: 8 },
+    { id: 'analyses', label: 'Analyses', icon: BarChart3, active: selectedTab === 'analyses', count: 3 }
+  ]
+
+  // Pills pour les sous-sections
+  const analysisPills = [
+    { id: 'marge', label: 'Analyse Marge', active: selectedPill === 'marge', count: 247 },
+    { id: 'stock', label: 'Analyse Stock', active: selectedPill === 'stock', count: 12 },
+    { id: 'pareto', label: 'Pareto', active: selectedPill === 'pareto' },
+    { id: 'abc-xyz', label: 'ABC/XYZ', active: selectedPill === 'abc-xyz' },
+    { id: 'saisonnalite', label: 'Saisonnalité', active: selectedPill === 'saisonnalite', disabled: true }
+  ]
+
+  const handleLoadingTest = (): void => {
+    setLoading(true)
+    setTimeout(() => setLoading(false), 3000)
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">
-          PharmaLab - Extracteur de Données
-        </h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
+      
+      {/* Sidebar en overlay */}
+      <Sidebar 
+        items={sidebarItems}
+        onItemClick={setSelectedTab}
+        defaultCollapsed={true}
+      />
 
-        {/* Sélecteur KPI */}
-        <div className="mb-6">
-          <label htmlFor="kpi-select" className="block text-sm font-medium text-gray-700 mb-2">
-            Type d'extraction :
-          </label>
-          <select
-            id="kpi-select"
-            value={selectedKpi}
-            onChange={(e) => setSelectedKpi(e.target.value)}
-            className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="">Sélectionner un KPI...</option>
-            {availableKpis.map((kpi) => (
-              <option key={kpi.id} value={kpi.id}>
-                {kpi.label}
-              </option>
-            ))}
-          </select>
-          {selectedKpi && availableKpis.find(opt => opt.id === selectedKpi) && (
-            <p className="text-sm text-gray-600 mt-2">
-              {availableKpis.find(opt => opt.id === selectedKpi)?.description}
-            </p>
-          )}
+      {/* Contenu principal avec marge pour la sidebar */}
+      <div className="ml-20 p-8">
+        
+        {/* Header */}
+        <div className="mb-8">
+          <Text variant="h1" weight="bold" className="mb-2">
+            🧩 Test des Molecules Glassmorphism
+          </Text>
+          <Text variant="body" color="secondary">
+            Validation des composants moyens du design system EXTRACT
+          </Text>
         </div>
 
-        {/* Rendu du composant KPI sélectionné */}
-        {renderKpiComponent()}
+        {/* Navigation Tabs */}
+        <div className="mb-8">
+          <Text variant="h3" weight="semibold" className="mb-4">
+            📑 Navigation - Variant Tabs
+          </Text>
+          <Navigation 
+            tabs={navigationTabs}
+            onTabClick={setSelectedTab}
+            variant="tabs"
+          />
+        </div>
+
+        {/* KPI Cards Grid */}
+        <div className="mb-8">
+          <div className="flex justify-between items-center mb-4">
+            <Text variant="h3" weight="semibold">
+              📊 KPI Cards - Grid 2x2
+            </Text>
+            <Button onClick={handleLoadingTest} variant="outline" size="sm">
+              🔄 Tester loading (3s)
+            </Button>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {kpiData.map((kpi, index) => (
+              <KpiCard
+                key={index}
+                title={kpi.title}
+                value={kpi.value}
+                icon={kpi.icon}
+                trend={kpi.trend}
+                loading={loading}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Navigation Pills */}
+        <div className="mb-8">
+          <Text variant="h3" weight="semibold" className="mb-4">
+            💊 Navigation - Variant Pills
+          </Text>
+          <Navigation 
+            tabs={analysisPills}
+            onTabClick={setSelectedPill}
+            variant="pills"
+          />
+        </div>
+
+        {/* Charts Section */}
+        <div className="grid lg:grid-cols-2 gap-6 mb-8">
+          <Chart
+            title="Évolution CA Mensuel"
+            subtitle="Chiffre d'affaires sur 12 mois"
+            data={chartData}
+            height={280}
+            color="#374151"
+            loading={loading}
+          />
+          
+          <Chart
+            title="Marge par Trimestre"
+            subtitle="Évolution de la marge brute"
+            data={[
+              { name: 'Q1 2024', value: 245000 },
+              { name: 'Q2 2024', value: 267000 },
+              { name: 'Q3 2024', value: 253000 },
+              { name: 'Q4 2024', value: 289000 }
+            ]}
+            height={280}
+            color="#059669"
+            loading={loading}
+          />
+        </div>
+
+        {/* Composants individuels */}
+        <div className="grid lg:grid-cols-3 gap-6">
+          
+          {/* KPI Card Seule */}
+          <Card variant="elevated" className="p-6">
+            <Text variant="h4" weight="semibold" className="mb-4">
+              KpiCard Individuelle
+            </Text>
+            <KpiCard
+              title="TEST METRIC"
+              value={156789}
+              icon={Activity}
+              trend={{ value: 8.7, type: 'positive', label: "Cette semaine" }}
+              className="mb-4"
+            />
+            <Text variant="caption" color="muted">
+              Composant standalone avec formatage français automatique
+            </Text>
+          </Card>
+
+          {/* Chart Petite */}
+          <Card variant="elevated" className="p-6">
+            <Text variant="h4" weight="semibold" className="mb-4">
+              Chart Compacte
+            </Text>
+            <Chart
+              title="Ventes Hebdo"
+              data={[
+                { name: 'Lun', value: 12000 },
+                { name: 'Mar', value: 15000 },
+                { name: 'Mer', value: 18000 },
+                { name: 'Jeu', value: 14000 },
+                { name: 'Ven', value: 22000 },
+                { name: 'Sam', value: 28000 },
+                { name: 'Dim', value: 8000 }
+              ]}
+              height={200}
+              color="#7c3aed"
+              loading={loading}
+            />
+          </Card>
+
+          {/* Navigation Variations */}
+          <Card variant="elevated" className="p-6">
+            <Text variant="h4" weight="semibold" className="mb-4">
+              Navigation Tailles
+            </Text>
+            
+            <div className="space-y-4">
+              <div>
+                <Text variant="caption" color="muted" className="mb-2 block">
+                  Taille Small
+                </Text>
+                <Navigation 
+                  tabs={[
+                    { id: 'a', label: 'Small', active: true },
+                    { id: 'b', label: 'Test', count: 5 }
+                  ]}
+                  onTabClick={() => {}}
+                  variant="pills"
+                  size="sm"
+                />
+              </div>
+              
+              <div>
+                <Text variant="caption" color="muted" className="mb-2 block">
+                  Taille Large
+                </Text>
+                <Navigation 
+                  tabs={[
+                    { id: 'a', label: 'Large', active: true },
+                    { id: 'b', label: 'Button' }
+                  ]}
+                  onTabClick={() => {}}
+                  variant="pills"
+                  size="lg"
+                />
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-12 text-center">
+          <Text variant="caption" color="muted">
+            Molecules EXTRACT - Composants moyens glassmorphism validés ✅
+          </Text>
+        </div>
       </div>
     </div>
   )

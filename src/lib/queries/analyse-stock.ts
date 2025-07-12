@@ -136,12 +136,7 @@ export async function getAnalyseStock(
 
     let ventesQuery = config.client
       .from('ventes_mensuelles')
-      .select(`
-        produit_id,
-        quantite_vendue,
-        annee,
-        mois
-      `)
+      .select('produit_id, annee, mois, quantite_vendue')
       .in('produit_id', produitIds)
 
     if (anneeDebut === anneeFin) {
@@ -150,9 +145,9 @@ export async function getAnalyseStock(
         .gte('mois', moisDebut)
         .lte('mois', moisFin)
     } else {
-      ventesQuery = ventesQuery
-        .gte('annee', anneeDebut)
-        .lte('annee', anneeFin)
+      ventesQuery = ventesQuery.or(
+        `and(annee.eq.${anneeDebut},mois.gte.${moisDebut}),and(annee.eq.${anneeFin},mois.lte.${moisFin})`
+      )
     }
 
     const { data: ventesData, error: ventesError } = await ventesQuery
@@ -161,30 +156,25 @@ export async function getAnalyseStock(
       throw new Error(ventesError.message)
     }
 
-    // Étape 4: Récupérer stocks actuels
+    // Étape 4: Récupérer les stocks actuels
     const { data: stocksData, error: stocksError } = await config.client
       .from('stocks')
-      .select(`
-        produit_id,
-        quantite_rayon,
-        quantite_reserve,
-        date_extraction
-      `)
+      .select('produit_id, quantite_rayon, quantite_reserve')
       .in('produit_id', produitIds)
-      .order('date_extraction', { ascending: false })
 
     if (stocksError) {
       throw new Error(stocksError.message)
     }
 
-    // Créer des maps pour performance
+    // Agrégation des ventes par produit
     const ventesParProduit = new Map<number, { total: number, dernierMois: string }>()
+    
     ventesData?.forEach(vente => {
-      const quantite = vente.quantite_vendue || 0
       const moisKey = `${vente.annee}-${vente.mois.toString().padStart(2, '0')}`
+      const quantite = vente.quantite_vendue || 0
       
       if (!ventesParProduit.has(vente.produit_id)) {
-        ventesParProduit.set(vente.produit_id, { total: 0, dernierMois: moisKey })
+        ventesParProduit.set(vente.produit_id, { total: 0, dernierMois: '' })
       }
       
       const data = ventesParProduit.get(vente.produit_id)!
@@ -203,8 +193,8 @@ export async function getAnalyseStock(
       }
     })
 
-    // Étape 5: Analyser chaque produit et calculer les mois de stock
-    const produitsAvecStock: ProduitStock[] = []
+    // Étape 5: Analyser TOUS les produits et calculer les mois de stock
+    const tousLesProduitsAvecStock: ProduitStock[] = []
     let produitsRupture = 0
     let produitsSurstock = 0
     const stocksValides: number[] = []
@@ -213,10 +203,9 @@ export async function getAnalyseStock(
       const stock = stocksParProduit.get(produit.id)
       const ventesInfo = ventesParProduit.get(produit.id)
 
-      if (!stock) return
-
-      const stockRayon = stock.quantite_rayon || 0
-      const stockReserve = stock.quantite_reserve || 0
+      // Même sans stock, on inclut le produit
+      const stockRayon = stock?.quantite_rayon || 0
+      const stockReserve = stock?.quantite_reserve || 0
       const stockTotal = stockRayon + stockReserve
       const ventes12Mois = ventesInfo?.total || 0
       const ventesMoyenneMensuelle = ventes12Mois / 12
@@ -243,35 +232,23 @@ export async function getAnalyseStock(
         }
       }
 
-      // Vérifier si le produit correspond au critère de seuil
-      let respecteCritere = false
-      
-      if (params.mode === "dessous") {
-        respecteCritere = (moisStock === "Rupture") || 
-                         (typeof moisStock === "number" && moisStock < params.seuil_mois_stock)
-      } else {
-        respecteCritere = (moisStock === "Stock infini") || 
-                         (typeof moisStock === "number" && moisStock > params.seuil_mois_stock)
-      }
-
-      if (respecteCritere) {
-        produitsAvecStock.push({
-          ean13: produit.ean13_principal,
-          nom: produit.designation,
-          stock_rayon: stockRayon,
-          stock_reserve: stockReserve,
-          stock_total: stockTotal,
-          ventes_mensuelles_moyennes: Number(ventesMoyenneMensuelle.toFixed(1)),
-          mois_stock_calcule: typeof moisStock === "number" ? Number(moisStock.toFixed(1)) : moisStock,
-          ecart_seuil: typeof ecartSeuil === "number" ? Number(ecartSeuil.toFixed(1)) : ecartSeuil,
-          ventes_12_mois: ventes12Mois,
-          derniere_vente: ventesInfo?.dernierMois
-        })
-      }
+      // IMPORTANT: On ajoute TOUS les produits, pas seulement ceux qui respectent le critère
+      tousLesProduitsAvecStock.push({
+        ean13: produit.ean13_principal,
+        nom: produit.designation,
+        stock_rayon: stockRayon,
+        stock_reserve: stockReserve,
+        stock_total: stockTotal,
+        ventes_mensuelles_moyennes: Number(ventesMoyenneMensuelle.toFixed(1)),
+        mois_stock_calcule: typeof moisStock === "number" ? Number(moisStock.toFixed(1)) : moisStock,
+        ecart_seuil: typeof ecartSeuil === "number" ? Number(ecartSeuil.toFixed(1)) : ecartSeuil,
+        ventes_12_mois: ventes12Mois,
+        derniere_vente: ventesInfo?.dernierMois
+      })
     })
 
     // Trier par écart au seuil
-    produitsAvecStock.sort((a, b) => {
+    tousLesProduitsAvecStock.sort((a, b) => {
       // Gérer les cas spéciaux en premier
       if (a.mois_stock_calcule === "Rupture" && b.mois_stock_calcule !== "Rupture") return -1
       if (b.mois_stock_calcule === "Rupture" && a.mois_stock_calcule !== "Rupture") return 1
@@ -303,8 +280,8 @@ export async function getAnalyseStock(
           fin: periodeFin
         }
       },
-      produits_trouves: produitsAvecStock,
-      total_produits: produitsAvecStock.length,
+      produits_trouves: tousLesProduitsAvecStock, // TOUS les produits maintenant
+      total_produits: tousLesProduitsAvecStock.length,
       resume: {
         stock_moyen: Number(stockMoyen.toFixed(1)),
         produits_rupture: produitsRupture,
